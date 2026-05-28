@@ -1,6 +1,6 @@
-# Yin Wei Studio MVP
+# Amber Script MVP
 
-This repo contains a zero-dependency first version of the Yin Wei Studio sales page, centered on the Candle Listing Turbo service.
+This repo contains a zero-dependency first version of the Amber Script sales page, centered on the Candle Listing Turbo service.
 
 ## What is included
 
@@ -17,7 +17,7 @@ This repo contains a zero-dependency first version of the Yin Wei Studio sales p
 
 ## Fast customization checklist
 
-- Brand name: edit `Yin Wei Studio` in `index.html`
+- Brand name: edit `Amber Script` in `index.html`
 - Pricing: update the three package cards in `index.html`
 - CTA destinations: update `siteConfig` in `script.js`
 - Niche defaults: change the candle-specific hero, sample, and demo defaults if needed
