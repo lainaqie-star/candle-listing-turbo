@@ -327,7 +327,8 @@ h4 {
 .faq-grid,
 .order-grid,
 .specimen-grid,
-.assurance-grid {
+.assurance-grid,
+.case-grid {
   display: grid;
   gap: 18px;
 }
@@ -338,7 +339,8 @@ h4 {
 .specimen-side,
 .assurance-card,
 .note-band,
-.note-promise {
+.note-promise,
+.case-card {
   border: 1px solid var(--line);
   border-radius: var(--radius-xl);
   background: var(--surface);
@@ -442,6 +444,44 @@ h4 {
 
 .assurance-card {
   padding: 22px;
+}
+
+.case-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.case-card {
+  padding: 24px;
+  background: linear-gradient(180deg, rgba(255, 250, 243, 0.9), rgba(255, 255, 255, 0.76));
+}
+
+.case-topline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.case-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 7px 12px;
+  border-radius: 999px;
+  background: rgba(242, 92, 42, 0.1);
+  color: var(--accent-deep);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.case-summary {
+  color: var(--muted);
+}
+
+.case-block + .case-block {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px dashed rgba(23, 33, 43, 0.14);
 }
 
 .card-grid {
@@ -608,7 +648,8 @@ select:focus {
   .order-grid,
   .intro-card,
   .specimen-grid,
-  .assurance-grid {
+  .assurance-grid,
+  .case-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -637,7 +678,8 @@ select:focus {
   .order-grid,
   .intro-card,
   .specimen-grid,
-  .assurance-grid {
+  .assurance-grid,
+  .case-grid {
     grid-template-columns: 1fr;
   }
 
