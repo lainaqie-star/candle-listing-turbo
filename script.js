@@ -16,8 +16,44 @@ const wordCount = document.querySelector("#word-count");
 
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
+const languageOptions = [
+  ["zh-CN", "Chinese (Simplified)"],
+  ["zh-HK", "Chinese (Hong Kong)"],
+  ["zh-TW", "Chinese (Traditional)"],
+  ["en-US", "English (US)"],
+  ["en-GB", "English (UK)"],
+  ["ja-JP", "Japanese"],
+  ["ko-KR", "Korean"],
+  ["es-ES", "Spanish"],
+  ["fr-FR", "French"],
+  ["de-DE", "German"],
+  ["pt-BR", "Portuguese (Brazil)"],
+  ["it-IT", "Italian"],
+  ["ru-RU", "Russian"],
+  ["ar-SA", "Arabic"],
+  ["hi-IN", "Hindi"],
+  ["id-ID", "Indonesian"],
+  ["tr-TR", "Turkish"],
+  ["vi-VN", "Vietnamese"],
+  ["th-TH", "Thai"],
+  ["nl-NL", "Dutch"],
+];
+
 let recognition = null;
 let isRecording = false;
+
+function populateLanguages() {
+  languageSelect.innerHTML = "";
+
+  languageOptions.forEach(([value, label]) => {
+    const option = document.createElement("option");
+    option.value = value;
+    option.textContent = label;
+    languageSelect.append(option);
+  });
+
+  languageSelect.value = "zh-CN";
+}
 
 function updateSupportState() {
   if (SpeechRecognition) {
@@ -225,5 +261,6 @@ document.addEventListener("keydown", (event) => {
 });
 
 updateSupportState();
+populateLanguages();
 updateWordCount();
 applyOutputBehaviors();
