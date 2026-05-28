@@ -330,6 +330,35 @@ h4 {
   gap: 18px;
 }
 
+.intro-card,
+.intro-points {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xl);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.intro-card {
+  display: grid;
+  gap: 18px;
+  grid-template-columns: 1.4fr 0.9fr;
+  padding: 24px;
+}
+
+.intro-copy p:last-child {
+  margin-bottom: 0;
+}
+
+.intro-points {
+  padding: 22px;
+  background: linear-gradient(180deg, rgba(255, 247, 235, 0.88), rgba(255, 255, 255, 0.72));
+}
+
+.intro-points ul {
+  padding-left: 18px;
+  margin-bottom: 0;
+}
+
 .card-grid {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
@@ -491,7 +520,8 @@ select:focus {
   .timeline,
   .faq-grid,
   .before-after-grid,
-  .order-grid {
+  .order-grid,
+  .intro-card {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
@@ -513,7 +543,8 @@ select:focus {
   .revenue-grid,
   .faq-grid,
   .before-after-grid,
-  .order-grid {
+  .order-grid,
+  .intro-card {
     grid-template-columns: 1fr;
   }
 
