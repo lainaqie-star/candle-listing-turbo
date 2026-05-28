@@ -41,6 +41,12 @@ a {
   text-decoration: none;
 }
 
+.inline-link {
+  color: var(--accent-deep);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 .page-shell {
   width: min(100%, var(--max-width));
   margin: 0 auto;

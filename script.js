@@ -122,7 +122,7 @@ function handleOrderForm(event) {
   const mainScent = formData.get("main-scent");
   const replyEmail = formData.get("reply-email");
 
-  const subject = encodeURIComponent(`Candle Listing Turbo Order - ${selectedPackage}`);
+  const subject = encodeURIComponent(`Yin Wei Studio Order - ${selectedPackage}`);
   const body = encodeURIComponent(
     [
       `Package: ${selectedPackage}`,

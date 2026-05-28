@@ -1,6 +1,6 @@
-# Candle Listing Turbo MVP
+# Yin Wei Studio MVP
 
-This repo contains a zero-dependency first version of a candle-focused productized service sales page.
+This repo contains a zero-dependency first version of the Yin Wei Studio sales page, centered on the Candle Listing Turbo service.
 
 ## What is included
 
@@ -12,12 +12,12 @@ This repo contains a zero-dependency first version of a candle-focused productiz
 
 1. Open `index.html` directly in a browser for a quick preview.
 2. Replace the placeholder checkout links in `script.js`.
-3. Replace `hello@example.com` with your real inbox or payment URL.
+3. Replace any remaining placeholder links with your live payment URLs if you change packages later.
 4. Update the copy so the promise matches how you actually deliver.
 
 ## Fast customization checklist
 
-- Brand name: edit `Candle Listing Turbo` in `index.html`
+- Brand name: edit `Yin Wei Studio` in `index.html`
 - Pricing: update the three package cards in `index.html`
 - CTA destinations: update `siteConfig` in `script.js`
 - Niche defaults: change the candle-specific hero, sample, and demo defaults if needed
