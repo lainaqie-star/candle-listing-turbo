@@ -26,7 +26,7 @@ This repo contains a zero-dependency first version of the Amber Script sales pag
 
 1. Prospect lands on the page
 2. Prospect submits the simple order form or emails `lainaqie@gmail.com`
-3. You reply with a Stripe or Gumroad payment link
+3. You reply with a Stripe payment link
 4. After payment, send the intake template and deliver manually
 
 ## What to sell first
