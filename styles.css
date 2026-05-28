@@ -187,7 +187,8 @@ h4 {
 .tips-card li,
 .assurance-card p,
 .case-summary,
-.history-list p {
+.history-list p,
+.toggle-row span {
   color: var(--muted);
 }
 
@@ -373,6 +374,23 @@ h4 {
   gap: 16px;
 }
 
+.toggle-stack {
+  display: grid;
+  gap: 10px;
+}
+
+.toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-weight: 700;
+}
+
+.toggle-row input {
+  width: auto;
+  margin: 0;
+}
+
 label {
   display: grid;
   gap: 8px;
@@ -475,6 +493,20 @@ textarea:focus {
   display: grid;
   gap: 12px;
   grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.target-shell {
+  margin-top: 20px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: rgba(255, 255, 255, 0.62);
+}
+
+#target-output {
+  min-height: 140px;
+  margin-top: 12px;
+  resize: vertical;
 }
 
 .before-after-grid {

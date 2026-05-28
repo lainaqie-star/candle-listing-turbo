@@ -11,12 +11,20 @@ const wordCount = document.querySelector("#word-count");
 const tidyButton = document.querySelector("#tidy-button");
 const notesButton = document.querySelector("#notes-button");
 const emailButton = document.querySelector("#email-button");
+const meetingButton = document.querySelector("#meeting-button");
+const todoButton = document.querySelector("#todo-button");
+const socialButton = document.querySelector("#social-button");
+const rewriteButton = document.querySelector("#rewrite-button");
 const copyButton = document.querySelector("#copy-button");
 const saveButton = document.querySelector("#save-button");
 const clearButton = document.querySelector("#clear-button");
 const historyList = document.querySelector("#history-list");
 const refreshHistoryButton = document.querySelector("#refresh-history");
 const clearHistoryButton = document.querySelector("#clear-history");
+const autoCopyToggle = document.querySelector("#auto-copy-toggle");
+const autoInsertToggle = document.querySelector("#auto-insert-toggle");
+const targetOutput = document.querySelector("#target-output");
+const targetStatus = document.querySelector("#target-status");
 
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 const HISTORY_KEY = "echotype-history";
@@ -164,6 +172,55 @@ function formatAsEmail(text) {
   return `${openers[mode] || "Hi,"}\n\n${cleaned}\n\nBest,`;
 }
 
+function formatAsMeetingNotes(text) {
+  const cleaned = tidyText(text);
+  if (!cleaned) {
+    return "";
+  }
+
+  const sections = cleaned
+    .split(/[.!?]\s+/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  const bullets = sections.map((section) => `- ${section.replace(/[.!?]$/, "")}`).join("\n");
+  return `Meeting notes\n\nKey points\n${bullets}`;
+}
+
+function formatAsTodo(text) {
+  const cleaned = tidyText(text);
+  if (!cleaned) {
+    return "";
+  }
+
+  return cleaned
+    .split(/[.!?]\s+/)
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .map((part) => `[] ${part.replace(/[.!?]$/, "")}`)
+    .join("\n");
+}
+
+function formatAsSocial(text) {
+  const cleaned = tidyText(text);
+  if (!cleaned) {
+    return "";
+  }
+
+  return `${cleaned}\n\n#idea #draft`;
+}
+
+function rewriteCleanly(text) {
+  const cleaned = tidyText(text);
+  if (!cleaned) {
+    return "";
+  }
+
+  return cleaned
+    .replace(/\bi need to\b/gi, "I need to")
+    .replace(/\bjust wanted to\b/gi, "I wanted to");
+}
+
 function copyText() {
   navigator.clipboard.writeText(transcriptOutput.value).then(() => {
     statusText.textContent = "Copied to clipboard.";
@@ -175,6 +232,19 @@ function copyText() {
 function updateWordCount() {
   const words = transcriptOutput.value.trim().split(/\s+/).filter(Boolean);
   wordCount.textContent = `${words.length} words`;
+}
+
+function applyAutoActions() {
+  if (autoInsertToggle.checked) {
+    targetOutput.value = transcriptOutput.value;
+    targetStatus.textContent = "Auto-insert active";
+  } else {
+    targetStatus.textContent = "Manual mode";
+  }
+
+  if (autoCopyToggle.checked) {
+    copyText();
+  }
 }
 
 function readHistory() {
@@ -271,26 +341,23 @@ function stopDictation() {
   }
 }
 
+function transformText(transformer, successMessage) {
+  transcriptOutput.value = transformer(transcriptOutput.value);
+  updateWordCount();
+  applyAutoActions();
+  statusText.textContent = successMessage;
+}
+
 recordButton.addEventListener("click", startDictation);
 stopButton.addEventListener("click", stopDictation);
 
-tidyButton.addEventListener("click", () => {
-  transcriptOutput.value = tidyText(transcriptOutput.value);
-  updateWordCount();
-  statusText.textContent = "Text cleaned up.";
-});
-
-notesButton.addEventListener("click", () => {
-  transcriptOutput.value = formatAsNotes(transcriptOutput.value);
-  updateWordCount();
-  statusText.textContent = "Formatted as notes.";
-});
-
-emailButton.addEventListener("click", () => {
-  transcriptOutput.value = formatAsEmail(transcriptOutput.value);
-  updateWordCount();
-  statusText.textContent = "Formatted as a lightweight email draft.";
-});
+tidyButton.addEventListener("click", () => transformText(tidyText, "Text cleaned up."));
+notesButton.addEventListener("click", () => transformText(formatAsNotes, "Formatted as notes."));
+emailButton.addEventListener("click", () => transformText(formatAsEmail, "Formatted as a lightweight email draft."));
+meetingButton.addEventListener("click", () => transformText(formatAsMeetingNotes, "Formatted as meeting notes."));
+todoButton.addEventListener("click", () => transformText(formatAsTodo, "Formatted as a to-do list."));
+socialButton.addEventListener("click", () => transformText(formatAsSocial, "Formatted as a social post draft."));
+rewriteButton.addEventListener("click", () => transformText(rewriteCleanly, "Rewritten more cleanly."));
 
 copyButton.addEventListener("click", copyText);
 
@@ -299,17 +366,50 @@ saveButton.addEventListener("click", saveSnapshot);
 clearButton.addEventListener("click", () => {
   transcriptOutput.value = "";
   interimOutput.textContent = "Waiting for speech...";
+  targetOutput.value = "";
   updateWordCount();
   statusText.textContent = "Workspace cleared.";
 });
 
 transcriptOutput.addEventListener("input", updateWordCount);
+autoInsertToggle.addEventListener("change", applyAutoActions);
+autoCopyToggle.addEventListener("change", () => {
+  statusText.textContent = autoCopyToggle.checked ? "Auto-copy enabled for formatting actions." : "Auto-copy disabled.";
+});
 
 refreshHistoryButton.addEventListener("click", renderHistory);
 clearHistoryButton.addEventListener("click", () => {
   writeHistory([]);
   renderHistory();
   statusText.textContent = "Local history cleared.";
+});
+
+document.addEventListener("keydown", (event) => {
+  const modifier = event.ctrlKey || event.metaKey;
+  if (!modifier || !event.shiftKey) {
+    return;
+  }
+
+  const key = event.key.toLowerCase();
+
+  if (key === "r") {
+    event.preventDefault();
+    if (isRecording) {
+      stopDictation();
+    } else {
+      startDictation();
+    }
+  }
+
+  if (key === "c") {
+    event.preventDefault();
+    copyText();
+  }
+
+  if (key === "s") {
+    event.preventDefault();
+    saveSnapshot();
+  }
 });
 
 updateSupportState();

@@ -192,6 +192,17 @@
                 <button class="button button-outline" id="stop-button" type="button" disabled>Stop</button>
               </div>
 
+              <div class="toggle-stack">
+                <label class="toggle-row">
+                  <input id="auto-copy-toggle" type="checkbox">
+                  <span>Auto-copy after formatting</span>
+                </label>
+                <label class="toggle-row">
+                  <input id="auto-insert-toggle" type="checkbox">
+                  <span>Auto-insert into target field below</span>
+                </label>
+              </div>
+
               <div class="live-status">
                 <span class="pulse-dot" id="pulse-dot"></span>
                 <p id="status-text">Ready. Click start and allow microphone access.</p>
@@ -204,6 +215,15 @@
                 <li>Speak in short phrases if you want cleaner line breaks.</li>
                 <li>Pause naturally between thoughts so the transcript stays readable.</li>
                 <li>Use the cleanup actions after dictation instead of chasing perfection mid-sentence.</li>
+              </ul>
+            </div>
+
+            <div class="tips-card">
+              <p class="mini-label">Keyboard shortcuts</p>
+              <ul>
+                <li><strong>Ctrl/Cmd + Shift + R</strong> to start or stop recording</li>
+                <li><strong>Ctrl/Cmd + Shift + C</strong> to copy the current text</li>
+                <li><strong>Ctrl/Cmd + Shift + S</strong> to save a snapshot</li>
               </ul>
             </div>
           </section>
@@ -232,9 +252,27 @@
               <button class="button button-outline" id="tidy-button" type="button">Tidy text</button>
               <button class="button button-outline" id="notes-button" type="button">Format as notes</button>
               <button class="button button-outline" id="email-button" type="button">Format as email</button>
+              <button class="button button-outline" id="meeting-button" type="button">Meeting notes</button>
+              <button class="button button-outline" id="todo-button" type="button">To-do list</button>
+              <button class="button button-outline" id="social-button" type="button">Social post</button>
+              <button class="button button-outline" id="rewrite-button" type="button">Rewrite cleanly</button>
               <button class="button button-outline" id="copy-button" type="button">Copy text</button>
               <button class="button button-outline" id="save-button" type="button">Save snapshot</button>
               <button class="button button-outline" id="clear-button" type="button">Clear</button>
+            </div>
+
+            <div class="target-shell">
+              <div class="panel-topline">
+                <div>
+                  <p class="mini-label">Target field</p>
+                  <h4>Auto-insert preview</h4>
+                </div>
+                <span class="word-count" id="target-status">Manual mode</span>
+              </div>
+              <textarea
+                id="target-output"
+                placeholder="When auto-insert is enabled, formatted output will also appear here to simulate pasting into another app."
+              ></textarea>
             </div>
           </section>
         </div>
@@ -458,6 +496,14 @@
           <article class="faq-card">
             <h4>Where is my history stored?</h4>
             <p>The current prototype stores saved snapshots locally in your browser on this device.</p>
+          </article>
+          <article class="faq-card">
+            <h4>Does global shortcut support already exist?</h4>
+            <p>This browser prototype includes in-page shortcuts. True system-wide shortcuts would be part of a later desktop or extension version.</p>
+          </article>
+          <article class="faq-card">
+            <h4>Can it auto-paste into any app already?</h4>
+            <p>Not across the whole operating system yet. This version shows the workflow with an auto-insert preview inside the app itself.</p>
           </article>
         </div>
       </section>
