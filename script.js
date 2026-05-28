@@ -1,9 +1,9 @@
 const siteConfig = {
   brandEmail: "lainaqie@gmail.com",
   starterCheckout: "https://buy.stripe.com/6oUbIUbTz5Ptf695aT1RC00",
-  growthCheckout: "#order",
-  launchCheckout: "#order",
-  primaryCheckout: "#order",
+  growthCheckout: "https://buy.stripe.com/00w3cog9Pb9Nf691YH1RC01",
+  launchCheckout: "https://buy.stripe.com/00waEQ6zfdhV0bfcDl1RC02",
+  primaryCheckout: "https://buy.stripe.com/00w3cog9Pb9Nf691YH1RC01",
 };
 
 const styleVoices = {
