@@ -1,165 +1,317 @@
-const siteConfig = {
-  brandEmail: "lainaqie@gmail.com",
-  starterCheckout: "https://buy.stripe.com/6oUbIUbTz5Ptf695aT1RC00",
-  growthCheckout: "https://buy.stripe.com/00w3cog9Pb9Nf691YH1RC01",
-  launchCheckout: "https://buy.stripe.com/00waEQ6zfdhV0bfcDl1RC02",
-  primaryCheckout: "https://buy.stripe.com/00w3cog9Pb9Nf691YH1RC01",
-};
+const transcriptOutput = document.querySelector("#transcript-output");
+const interimOutput = document.querySelector("#interim-output");
+const statusText = document.querySelector("#status-text");
+const supportPill = document.querySelector("#support-pill");
+const pulseDot = document.querySelector("#pulse-dot");
+const recordButton = document.querySelector("#record-button");
+const stopButton = document.querySelector("#stop-button");
+const languageSelect = document.querySelector("#language-select");
+const modeSelect = document.querySelector("#mode-select");
+const wordCount = document.querySelector("#word-count");
+const tidyButton = document.querySelector("#tidy-button");
+const notesButton = document.querySelector("#notes-button");
+const emailButton = document.querySelector("#email-button");
+const copyButton = document.querySelector("#copy-button");
+const saveButton = document.querySelector("#save-button");
+const clearButton = document.querySelector("#clear-button");
+const historyList = document.querySelector("#history-list");
+const refreshHistoryButton = document.querySelector("#refresh-history");
+const clearHistoryButton = document.querySelector("#clear-history");
 
-const styleVoices = {
-  warm: {
-    tone: "warm, cozy, and reassuring",
-    opener: "Turn an everyday corner into a softer, calmer ritual.",
-    imageText: "Cozy glow, slow burn, gift-ready feel",
-  },
-  clean: {
-    tone: "clean, minimal, and polished",
-    opener: "A simplified product experience that feels thoughtful from the first glance.",
-    imageText: "Minimal design, elevated detail, clutter-free mood",
-  },
-  playful: {
-    tone: "fun, bright, and giftable",
-    opener: "Made to spark an instant smile before the package is even opened.",
-    imageText: "Giftable, cheerful, easy to love",
-  },
-  luxury: {
-    tone: "premium, refined, and indulgent",
-    opener: "Designed to feel elevated, intentional, and worth lingering over.",
-    imageText: "Refined finish, premium feel, small indulgence",
-  },
-};
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+const HISTORY_KEY = "echotype-history";
 
-const titleEl = document.querySelector("#preview-title");
-const hookEl = document.querySelector("#preview-hook");
-const descriptionEl = document.querySelector("#preview-description");
-const tagsEl = document.querySelector("#preview-tags");
-const imageTextEl = document.querySelector("#preview-image-text");
-const formEl = document.querySelector("#listing-form");
-const orderFormEl = document.querySelector("#order-form");
+let recognition = null;
+let isRecording = false;
 
-function applyCheckoutLinks() {
-  const linkMap = new Map([
-    ["#nav-order-link", siteConfig.primaryCheckout],
-    ["#hero-order-link", siteConfig.primaryCheckout],
-    ["#starter-link", siteConfig.starterCheckout],
-    ["#growth-link", siteConfig.growthCheckout],
-    ["#launch-link", siteConfig.launchCheckout],
-    ["#cta-order-link", siteConfig.primaryCheckout],
-  ]);
+function updateSupportState() {
+  if (SpeechRecognition) {
+    supportPill.textContent = "Speech ready";
+    supportPill.classList.remove("unsupported");
+    statusText.textContent = "Ready. Click start and allow microphone access.";
+    recordButton.disabled = false;
+    return;
+  }
 
-  linkMap.forEach((href, selector) => {
-    const node = document.querySelector(selector);
-    if (node) {
-      node.href = href;
-    }
-  });
+  supportPill.textContent = "Browser unsupported";
+  supportPill.classList.add("unsupported");
+  statusText.textContent = "This browser does not expose the Web Speech API. You can still type into the editor and test the product shell.";
+  recordButton.disabled = true;
+  stopButton.disabled = true;
 }
 
-function uniqTags(words) {
-  return [...new Set(words.map((word) => word.trim()).filter(Boolean))].slice(0, 13);
-}
+function createRecognition() {
+  if (!SpeechRecognition) {
+    return null;
+  }
 
-function generatePreview({ product, audience, style, feature }) {
-  const voice = styleVoices[style] || styleVoices.warm;
-  const productTitle = product.trim();
-  const audienceText = audience.trim();
-  const featureText = feature.trim();
+  const instance = new SpeechRecognition();
+  instance.continuous = true;
+  instance.interimResults = true;
+  instance.lang = languageSelect.value;
 
-  const title = `${capitalize(productTitle)} for ${capitalizeShort(audienceText)} | ${capitalizeShort(featureText)}`;
-  const hook = `${voice.opener} This ${productTitle} is positioned for ${audienceText} with a ${voice.tone} angle.`;
-  const description = `Created for ${audienceText}, this ${productTitle} stands out through ${featureText}. The copy should highlight the emotional payoff first, then quickly make the practical details easy to trust. That structure helps the buyer picture the product in their life before they compare specs.`;
-  const rawTags = uniqTags([
-    productTitle,
-    audienceText,
-    featureText,
-    `${productTitle} gift`,
-    `${productTitle} etsy`,
-    "small business gift",
-    "shop update",
-    "etsy listing help",
-    "giftable home item",
-    "keyword refresh",
-    "product description",
-  ]);
-
-  return {
-    title,
-    hook,
-    description,
-    tags: rawTags.join(" | "),
-    imageText: voice.imageText,
+  instance.onstart = () => {
+    isRecording = true;
+    pulseDot.classList.add("active");
+    statusText.textContent = "Listening now. Speak naturally.";
+    recordButton.disabled = true;
+    stopButton.disabled = false;
   };
+
+  instance.onend = () => {
+    isRecording = false;
+    pulseDot.classList.remove("active");
+    statusText.textContent = "Stopped. You can review, edit, or start again.";
+    recordButton.disabled = false;
+    stopButton.disabled = true;
+  };
+
+  instance.onerror = (event) => {
+    isRecording = false;
+    pulseDot.classList.remove("active");
+    recordButton.disabled = false;
+    stopButton.disabled = true;
+
+    const messageMap = {
+      "not-allowed": "Microphone access was blocked. Allow microphone permission and try again.",
+      "audio-capture": "No microphone was detected. Check your input device and try again.",
+      "no-speech": "No speech was heard. Try again and speak a little closer to the microphone.",
+      "network": "Speech recognition had a network problem. Try again in a moment.",
+    };
+
+    statusText.textContent = messageMap[event.error] || "Speech recognition stopped unexpectedly. Try again.";
+  };
+
+  instance.onresult = (event) => {
+    let finalText = "";
+    let interimText = "";
+
+    for (let i = event.resultIndex; i < event.results.length; i += 1) {
+      const snippet = event.results[i][0].transcript;
+      if (event.results[i].isFinal) {
+        finalText += snippet;
+      } else {
+        interimText += snippet;
+      }
+    }
+
+    if (finalText) {
+      const current = transcriptOutput.value.trim();
+      const appended = normalizeDictation(finalText, languageSelect.value);
+      transcriptOutput.value = current ? `${current}\n${appended}` : appended;
+      updateWordCount();
+    }
+
+    interimOutput.textContent = interimText || "Waiting for more speech...";
+  };
+
+  return instance;
 }
 
-function capitalize(text) {
+function normalizeDictation(text, language) {
+  let next = text.trim();
+
+  if (language.startsWith("en")) {
+    next = next
+      .replace(/\bnew line\b/gi, "\n")
+      .replace(/\bcomma\b/gi, ",")
+      .replace(/\bperiod\b/gi, ".")
+      .replace(/\bquestion mark\b/gi, "?");
+    next = tidyText(next);
+  }
+
+  return next;
+}
+
+function tidyText(text) {
   return text
-    .split(" ")
+    .replace(/\s+/g, " ")
+    .replace(/\s+([,.!?;:])/g, "$1")
+    .replace(/([,.!?])([A-Za-z])/g, "$1 $2")
+    .replace(/^\s*[a-z]/, (match) => match.toUpperCase())
+    .replace(/(^|[.!?]\s+)([a-z])/g, (_, prefix, letter) => `${prefix}${letter.toUpperCase()}`)
+    .trim();
+}
+
+function formatAsNotes(text) {
+  const cleaned = tidyText(text);
+  if (!cleaned) {
+    return "";
+  }
+
+  return cleaned
+    .split(/[.!?]\s+/)
+    .map((part) => part.trim())
     .filter(Boolean)
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ");
+    .map((part) => `- ${part.replace(/[.!?]$/, "")}`)
+    .join("\n");
 }
 
-function capitalizeShort(text) {
-  const cleaned = capitalize(text);
-  return cleaned.length > 38 ? `${cleaned.slice(0, 35)}...` : cleaned;
+function formatAsEmail(text) {
+  const cleaned = tidyText(text);
+  if (!cleaned) {
+    return "";
+  }
+
+  const mode = modeSelect.value;
+  const openers = {
+    email: "Hi,",
+    chat: "Hi,",
+    notes: "Summary:",
+    ideas: "Idea draft:",
+  };
+
+  return `${openers[mode] || "Hi,"}\n\n${cleaned}\n\nBest,`;
 }
 
-function renderPreview(payload) {
-  titleEl.textContent = payload.title;
-  hookEl.textContent = payload.hook;
-  descriptionEl.textContent = payload.description;
-  tagsEl.textContent = payload.tags;
-  imageTextEl.textContent = payload.imageText;
+function copyText() {
+  navigator.clipboard.writeText(transcriptOutput.value).then(() => {
+    statusText.textContent = "Copied to clipboard.";
+  }).catch(() => {
+    statusText.textContent = "Copy failed in this browser. You can still select and copy manually.";
+  });
 }
 
-function handleOrderForm(event) {
-  event.preventDefault();
-
-  const formData = new FormData(orderFormEl);
-  const selectedPackage = formData.get("order-package");
-  const shopName = formData.get("shop-name");
-  const shopUrl = formData.get("shop-url");
-  const mainScent = formData.get("main-scent");
-  const replyEmail = formData.get("reply-email");
-
-  const subject = encodeURIComponent(`Amber Script Order - ${selectedPackage}`);
-  const body = encodeURIComponent(
-    [
-      `Package: ${selectedPackage}`,
-      `Shop name: ${shopName}`,
-      `Shop URL: ${shopUrl}`,
-      `Main product or scent: ${mainScent}`,
-      `Best reply email: ${replyEmail}`,
-      "",
-      "Please send me the next steps, payment link, and delivery timeline.",
-    ].join("\n"),
-  );
-
-  window.location.href = `mailto:${siteConfig.brandEmail}?subject=${subject}&body=${body}`;
+function updateWordCount() {
+  const words = transcriptOutput.value.trim().split(/\s+/).filter(Boolean);
+  wordCount.textContent = `${words.length} words`;
 }
 
-formEl.addEventListener("submit", (event) => {
-  event.preventDefault();
+function readHistory() {
+  try {
+    return JSON.parse(localStorage.getItem(HISTORY_KEY) || "[]");
+  } catch {
+    return [];
+  }
+}
 
-  const formData = new FormData(formEl);
-  const preview = generatePreview({
-    product: formData.get("product"),
-    audience: formData.get("audience"),
-    style: formData.get("style"),
-    feature: formData.get("feature"),
+function writeHistory(items) {
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(items));
+}
+
+function renderHistory() {
+  const items = readHistory();
+
+  if (!items.length) {
+    historyList.innerHTML = '<p class="empty-history">No saved snippets yet. Dictate or type something, then save a snapshot.</p>';
+    return;
+  }
+
+  historyList.innerHTML = items
+    .map((item) => `
+      <article class="history-item">
+        <header>
+          <h4>${escapeHtml(item.title)}</h4>
+          <span class="history-meta">${escapeHtml(item.savedAt)}</span>
+        </header>
+        <p>${escapeHtml(item.preview)}</p>
+      </article>
+    `)
+    .join("");
+}
+
+function saveSnapshot() {
+  const value = transcriptOutput.value.trim();
+  if (!value) {
+    statusText.textContent = "There is nothing to save yet.";
+    return;
+  }
+
+  const items = readHistory();
+  const preview = value.replace(/\n+/g, " ").slice(0, 160);
+  const title = `${labelForMode(modeSelect.value)} snapshot`;
+  items.unshift({
+    title,
+    preview,
+    savedAt: new Date().toLocaleString(),
   });
 
-  renderPreview(preview);
+  writeHistory(items.slice(0, 10));
+  renderHistory();
+  statusText.textContent = "Saved to local history on this device.";
+}
+
+function labelForMode(mode) {
+  const labels = {
+    notes: "Notes",
+    chat: "Chat",
+    email: "Email",
+    ideas: "Ideas",
+  };
+
+  return labels[mode] || "Transcript";
+}
+
+function escapeHtml(value) {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+function startDictation() {
+  if (!SpeechRecognition) {
+    return;
+  }
+
+  if (!recognition) {
+    recognition = createRecognition();
+  }
+
+  recognition.lang = languageSelect.value;
+  interimOutput.textContent = "Listening...";
+  recognition.start();
+}
+
+function stopDictation() {
+  if (recognition && isRecording) {
+    recognition.stop();
+  }
+}
+
+recordButton.addEventListener("click", startDictation);
+stopButton.addEventListener("click", stopDictation);
+
+tidyButton.addEventListener("click", () => {
+  transcriptOutput.value = tidyText(transcriptOutput.value);
+  updateWordCount();
+  statusText.textContent = "Text cleaned up.";
 });
 
-orderFormEl.addEventListener("submit", handleOrderForm);
+notesButton.addEventListener("click", () => {
+  transcriptOutput.value = formatAsNotes(transcriptOutput.value);
+  updateWordCount();
+  statusText.textContent = "Formatted as notes.";
+});
 
-applyCheckoutLinks();
-renderPreview(
-  generatePreview({
-    product: "soy candle",
-    audience: "women buying cozy home gifts",
-    style: "warm",
-    feature: "amber jar and slow burn scent throw",
-  }),
-);
+emailButton.addEventListener("click", () => {
+  transcriptOutput.value = formatAsEmail(transcriptOutput.value);
+  updateWordCount();
+  statusText.textContent = "Formatted as a lightweight email draft.";
+});
+
+copyButton.addEventListener("click", copyText);
+
+saveButton.addEventListener("click", saveSnapshot);
+
+clearButton.addEventListener("click", () => {
+  transcriptOutput.value = "";
+  interimOutput.textContent = "Waiting for speech...";
+  updateWordCount();
+  statusText.textContent = "Workspace cleared.";
+});
+
+transcriptOutput.addEventListener("input", updateWordCount);
+
+refreshHistoryButton.addEventListener("click", renderHistory);
+clearHistoryButton.addEventListener("click", () => {
+  writeHistory([]);
+  renderHistory();
+  statusText.textContent = "Local history cleared.";
+});
+
+updateSupportState();
+renderHistory();
+updateWordCount();
