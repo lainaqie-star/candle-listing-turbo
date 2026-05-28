@@ -1,6 +1,6 @@
 const siteConfig = {
   brandEmail: "lainaqie@gmail.com",
-  starterCheckout: "#order",
+  starterCheckout: "https://buy.stripe.com/6oUbIUbTz5Ptf695aT1RC00",
   growthCheckout: "#order",
   launchCheckout: "#order",
   primaryCheckout: "#order",
