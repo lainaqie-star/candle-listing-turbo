@@ -8,6 +8,15 @@ using System.Runtime.Serialization;
 using System.Runtime.Serialization.Json;
 using System.Text;
 using System.Windows.Forms;
+using System.Reflection;
+
+[assembly: AssemblyTitle("EchoType")]
+[assembly: AssemblyDescription("System-wide voice input launcher for Windows")]
+[assembly: AssemblyCompany("EchoType")]
+[assembly: AssemblyProduct("EchoType Desktop")]
+[assembly: AssemblyCopyright("Copyright © 2026 EchoType")]
+[assembly: AssemblyVersion("0.1.0.0")]
+[assembly: AssemblyFileVersion("0.1.0.0")]
 
 namespace EchoTypeLauncher
 {
@@ -96,6 +105,7 @@ namespace EchoTypeLauncher
             MinimumSize = new Size(760, 560);
             BackColor = Color.FromArgb(245, 245, 247);
             Font = new Font("Segoe UI", 10);
+            Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath);
 
             BuildUi();
             BuildTray();
