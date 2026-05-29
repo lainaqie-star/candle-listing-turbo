@@ -24,6 +24,23 @@ if ([System.Threading.Thread]::CurrentThread.ApartmentState -ne "STA") {
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 
+$script:configPath = Join-Path $PSScriptRoot "config.json"
+$script:lastTargetHandle = [IntPtr]::Zero
+$script:allowExit = $false
+$script:notifyIcon = $null
+$script:trayMenu = $null
+$script:hotkeyWindow = $null
+$script:hotkeyId = 9001
+$script:hotkeyRegistered = $false
+$script:keyChoices = @(
+  "Space","A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P","Q","R","S","T","U","V","W","X","Y","Z",
+  "F1","F2","F3","F4","F5","F6","F7","F8","F9","F10","F11","F12"
+)
+$script:appConfig = [pscustomobject]@{
+  Modifiers = @("Control", "Shift")
+  Key = "Space"
+}
+
 if ($SelfTest) {
   [System.Windows.Forms.InputLanguage]::InstalledInputLanguages |
     ForEach-Object { "{0} | {1}" -f $_.Culture.Name, $_.Culture.EnglishName } |
@@ -39,8 +56,10 @@ using System.Runtime.InteropServices;
 namespace EchoType {
   public static class NativeMethods {
     public const int WM_HOTKEY = 0x0312;
+    public const int MOD_ALT = 0x0001;
     public const int MOD_CONTROL = 0x0002;
     public const int MOD_SHIFT = 0x0004;
+    public const int MOD_WIN = 0x0008;
     public const int SW_RESTORE = 9;
     public const byte VK_LWIN = 0x5B;
     public const byte VK_H = 0x48;
@@ -73,10 +92,8 @@ namespace EchoType {
     }
 
     protected override void WndProc(ref Message m) {
-      if (m.Msg == NativeMethods.WM_HOTKEY) {
-        if (HotkeyPressed != null) {
-          HotkeyPressed(this, EventArgs.Empty);
-        }
+      if (m.Msg == NativeMethods.WM_HOTKEY && HotkeyPressed != null) {
+        HotkeyPressed(this, EventArgs.Empty);
       }
       base.WndProc(ref m);
     }
@@ -97,8 +114,71 @@ namespace EchoType {
 }
 "@ -ReferencedAssemblies @("System.dll", "System.Windows.Forms.dll")
 
-$script:lastTargetHandle = [IntPtr]::Zero
-$script:isPrimed = $false
+function Load-Config {
+  if (-not (Test-Path $script:configPath)) {
+    return
+  }
+
+  try {
+    $raw = Get-Content -Raw $script:configPath | ConvertFrom-Json
+    if ($raw.Modifiers -and $raw.Key) {
+      $script:appConfig = [pscustomobject]@{
+        Modifiers = @($raw.Modifiers)
+        Key = [string]$raw.Key
+      }
+    }
+  } catch {}
+}
+
+function Save-Config {
+  $script:appConfig | ConvertTo-Json | Set-Content -Path $script:configPath
+}
+
+function Get-HotkeyModifierMask {
+  param(
+    [string[]]$Modifiers
+  )
+
+  $mask = 0
+  foreach ($modifier in $Modifiers) {
+    switch ($modifier) {
+      "Control" { $mask = $mask -bor [EchoType.NativeMethods]::MOD_CONTROL }
+      "Shift" { $mask = $mask -bor [EchoType.NativeMethods]::MOD_SHIFT }
+      "Alt" { $mask = $mask -bor [EchoType.NativeMethods]::MOD_ALT }
+      "Win" { $mask = $mask -bor [EchoType.NativeMethods]::MOD_WIN }
+    }
+  }
+  return $mask
+}
+
+function Get-HotkeyKeysValue {
+  param(
+    [string]$KeyName
+  )
+
+  switch ($KeyName) {
+    "Space" { return [int][System.Windows.Forms.Keys]::Space }
+    default { return [int][System.Windows.Forms.Keys]::$KeyName }
+  }
+}
+
+function Get-HotkeyDisplay {
+  param(
+    [string[]]$Modifiers,
+    [string]$KeyName
+  )
+
+  return ((@($Modifiers) + @($KeyName)) -join " + ")
+}
+
+function Get-SelectedModifiers {
+  $mods = @()
+  if ($ctrlCheckbox.Checked) { $mods += "Control" }
+  if ($shiftCheckbox.Checked) { $mods += "Shift" }
+  if ($altCheckbox.Checked) { $mods += "Alt" }
+  if ($winCheckbox.Checked) { $mods += "Win" }
+  return $mods
+}
 
 function Update-Status {
   param(
@@ -110,6 +190,77 @@ function Update-Status {
   if ($State) {
     $stateValueLabel.Text = $State
   }
+}
+
+function Unregister-AppHotkey {
+  if ($script:hotkeyRegistered -and $script:hotkeyWindow) {
+    try {
+      [EchoType.NativeMethods]::UnregisterHotKey($script:hotkeyWindow.Handle, $script:hotkeyId) | Out-Null
+    } catch {}
+    $script:hotkeyRegistered = $false
+  }
+}
+
+function Register-AppHotkey {
+  param(
+    [string[]]$Modifiers,
+    [string]$KeyName
+  )
+
+  Unregister-AppHotkey
+
+  $modifierMask = Get-HotkeyModifierMask -Modifiers $Modifiers
+  $virtualKey = Get-HotkeyKeysValue -KeyName $KeyName
+
+  $ok = [EchoType.NativeMethods]::RegisterHotKey(
+    $script:hotkeyWindow.Handle,
+    $script:hotkeyId,
+    $modifierMask,
+    $virtualKey
+  )
+
+  if (-not $ok) {
+    throw "Failed to register $(Get-HotkeyDisplay -Modifiers $Modifiers -KeyName $KeyName). Another app may already be using it."
+  }
+
+  $script:hotkeyRegistered = $true
+}
+
+function Apply-HotkeyFromControls {
+  $selectedModifiers = @(Get-SelectedModifiers)
+  $selectedKey = [string]$keyCombo.SelectedItem
+
+  if ($selectedModifiers.Count -eq 0) {
+    throw "Choose at least one modifier key."
+  }
+
+  if (-not $selectedKey) {
+    throw "Choose a hotkey key."
+  }
+
+  Register-AppHotkey -Modifiers $selectedModifiers -KeyName $selectedKey
+  $script:appConfig = [pscustomobject]@{
+    Modifiers = $selectedModifiers
+    Key = $selectedKey
+  }
+  Save-Config
+  $hotkeyValueLabel.Text = Get-HotkeyDisplay -Modifiers $selectedModifiers -KeyName $selectedKey
+  Update-Status -Text ("Saved hotkey: " + $hotkeyValueLabel.Text) -State "Ready"
+}
+
+function Show-MainWindow {
+  [EchoType.NativeMethods]::ShowWindowAsync($form.Handle, [EchoType.NativeMethods]::SW_RESTORE) | Out-Null
+  $form.Show()
+  $form.WindowState = [System.Windows.Forms.FormWindowState]::Normal
+  $form.Activate()
+}
+
+function Hide-ToTray {
+  $form.Hide()
+  if ($script:notifyIcon) {
+    $script:notifyIcon.Visible = $true
+  }
+  Update-Status -Text "Hidden to tray. EchoType is still running in the background." -State "Tray"
 }
 
 function Invoke-VoiceTyping {
@@ -125,9 +276,10 @@ function Invoke-VoiceTyping {
   }
 
   [EchoType.VoiceTypingBridge]::Trigger()
-  $script:isPrimed = $true
   Update-Status -Text "Windows voice typing was triggered. Speak into the target app." -State "Listening"
 }
+
+Load-Config
 
 $installedInputLanguages = [System.Windows.Forms.InputLanguage]::InstalledInputLanguages
 $languageSummary = ($installedInputLanguages | ForEach-Object { $_.Culture.EnglishName }) -join ", "
@@ -138,8 +290,8 @@ if (-not $languageSummary) {
 $form = New-Object System.Windows.Forms.Form
 $form.Text = "EchoType Desktop MVP"
 $form.StartPosition = "CenterScreen"
-$form.Size = New-Object System.Drawing.Size(760, 540)
-$form.MinimumSize = New-Object System.Drawing.Size(760, 540)
+$form.Size = New-Object System.Drawing.Size(760, 560)
+$form.MinimumSize = New-Object System.Drawing.Size(760, 560)
 $form.BackColor = [System.Drawing.Color]::FromArgb(245, 245, 247)
 $form.Font = New-Object System.Drawing.Font("Segoe UI", 10)
 
@@ -165,7 +317,7 @@ $hotkeyLabel.Location = New-Object System.Drawing.Point(32, 150)
 $form.Controls.Add($hotkeyLabel)
 
 $hotkeyValueLabel = New-Object System.Windows.Forms.Label
-$hotkeyValueLabel.Text = "Ctrl + Shift + Space"
+$hotkeyValueLabel.Text = Get-HotkeyDisplay -Modifiers $script:appConfig.Modifiers -KeyName $script:appConfig.Key
 $hotkeyValueLabel.AutoSize = $true
 $hotkeyValueLabel.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Bold)
 $hotkeyValueLabel.Location = New-Object System.Drawing.Point(32, 174)
@@ -216,6 +368,12 @@ $languageButton.Location = New-Object System.Drawing.Point(404, 242)
 $languageButton.Size = New-Object System.Drawing.Size(180, 42)
 $form.Controls.Add($languageButton)
 
+$trayButton = New-Object System.Windows.Forms.Button
+$trayButton.Text = "Hide to tray"
+$trayButton.Location = New-Object System.Drawing.Point(600, 242)
+$trayButton.Size = New-Object System.Drawing.Size(112, 42)
+$form.Controls.Add($trayButton)
+
 $statusLabel = New-Object System.Windows.Forms.Label
 $statusLabel.Text = "Ready. Click into any chat box, browser field, or AI prompt and use the hotkey."
 $statusLabel.MaximumSize = New-Object System.Drawing.Size(680, 0)
@@ -224,35 +382,84 @@ $statusLabel.ForeColor = [System.Drawing.Color]::FromArgb(110, 110, 115)
 $statusLabel.Location = New-Object System.Drawing.Point(32, 308)
 $form.Controls.Add($statusLabel)
 
-$cardPanel = New-Object System.Windows.Forms.Panel
-$cardPanel.Location = New-Object System.Drawing.Point(32, 356)
-$cardPanel.Size = New-Object System.Drawing.Size(680, 116)
-$cardPanel.BackColor = [System.Drawing.Color]::White
-$cardPanel.BorderStyle = [System.Windows.Forms.BorderStyle]::FixedSingle
-$form.Controls.Add($cardPanel)
+$hotkeyPanel = New-Object System.Windows.Forms.Panel
+$hotkeyPanel.Location = New-Object System.Drawing.Point(32, 356)
+$hotkeyPanel.Size = New-Object System.Drawing.Size(680, 124)
+$hotkeyPanel.BackColor = [System.Drawing.Color]::White
+$hotkeyPanel.BorderStyle = [System.Windows.Forms.BorderStyle]::FixedSingle
+$form.Controls.Add($hotkeyPanel)
 
-$cardTitle = New-Object System.Windows.Forms.Label
-$cardTitle.Text = "Language behavior"
-$cardTitle.AutoSize = $true
-$cardTitle.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Bold)
-$cardTitle.Location = New-Object System.Drawing.Point(18, 16)
-$cardPanel.Controls.Add($cardTitle)
+$panelTitle = New-Object System.Windows.Forms.Label
+$panelTitle.Text = "Hotkey and tray"
+$panelTitle.AutoSize = $true
+$panelTitle.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Bold)
+$panelTitle.Location = New-Object System.Drawing.Point(18, 16)
+$hotkeyPanel.Controls.Add($panelTitle)
 
-$cardBody = New-Object System.Windows.Forms.Label
-$cardBody.Text = "EchoType follows Windows voice typing. Switch your Windows input language to dictate in Chinese, English, Japanese, and other installed languages. Current installed input languages: $languageSummary."
-$cardBody.MaximumSize = New-Object System.Drawing.Size(640, 0)
-$cardBody.AutoSize = $true
-$cardBody.ForeColor = [System.Drawing.Color]::FromArgb(110, 110, 115)
-$cardBody.Location = New-Object System.Drawing.Point(18, 42)
-$cardPanel.Controls.Add($cardBody)
+$ctrlCheckbox = New-Object System.Windows.Forms.CheckBox
+$ctrlCheckbox.Text = "Ctrl"
+$ctrlCheckbox.AutoSize = $true
+$ctrlCheckbox.Location = New-Object System.Drawing.Point(18, 48)
+$hotkeyPanel.Controls.Add($ctrlCheckbox)
+
+$shiftCheckbox = New-Object System.Windows.Forms.CheckBox
+$shiftCheckbox.Text = "Shift"
+$shiftCheckbox.AutoSize = $true
+$shiftCheckbox.Location = New-Object System.Drawing.Point(84, 48)
+$hotkeyPanel.Controls.Add($shiftCheckbox)
+
+$altCheckbox = New-Object System.Windows.Forms.CheckBox
+$altCheckbox.Text = "Alt"
+$altCheckbox.AutoSize = $true
+$altCheckbox.Location = New-Object System.Drawing.Point(160, 48)
+$hotkeyPanel.Controls.Add($altCheckbox)
+
+$winCheckbox = New-Object System.Windows.Forms.CheckBox
+$winCheckbox.Text = "Win"
+$winCheckbox.AutoSize = $true
+$winCheckbox.Location = New-Object System.Drawing.Point(218, 48)
+$hotkeyPanel.Controls.Add($winCheckbox)
+
+$keyLabel = New-Object System.Windows.Forms.Label
+$keyLabel.Text = "Key"
+$keyLabel.AutoSize = $true
+$keyLabel.Location = New-Object System.Drawing.Point(302, 50)
+$hotkeyPanel.Controls.Add($keyLabel)
+
+$keyCombo = New-Object System.Windows.Forms.ComboBox
+$keyCombo.DropDownStyle = "DropDownList"
+$keyCombo.Location = New-Object System.Drawing.Point(340, 46)
+$keyCombo.Size = New-Object System.Drawing.Size(120, 28)
+[void]$keyCombo.Items.AddRange($script:keyChoices)
+$hotkeyPanel.Controls.Add($keyCombo)
+
+$applyHotkeyButton = New-Object System.Windows.Forms.Button
+$applyHotkeyButton.Text = "Save hotkey"
+$applyHotkeyButton.Location = New-Object System.Drawing.Point(480, 43)
+$applyHotkeyButton.Size = New-Object System.Drawing.Size(112, 34)
+$hotkeyPanel.Controls.Add($applyHotkeyButton)
+
+$hotkeyHelp = New-Object System.Windows.Forms.Label
+$hotkeyHelp.Text = "EchoType can stay in the tray and keep the global hotkey active while you work. Installed Windows input languages: $languageSummary."
+$hotkeyHelp.MaximumSize = New-Object System.Drawing.Size(632, 0)
+$hotkeyHelp.AutoSize = $true
+$hotkeyHelp.ForeColor = [System.Drawing.Color]::FromArgb(110, 110, 115)
+$hotkeyHelp.Location = New-Object System.Drawing.Point(18, 84)
+$hotkeyPanel.Controls.Add($hotkeyHelp)
 
 $footnoteLabel = New-Object System.Windows.Forms.Label
 $footnoteLabel.Text = "Tip: this MVP uses Windows' own voice typing layer, which is exactly why it can work outside a browser."
 $footnoteLabel.MaximumSize = New-Object System.Drawing.Size(680, 0)
 $footnoteLabel.AutoSize = $true
 $footnoteLabel.ForeColor = [System.Drawing.Color]::FromArgb(110, 110, 115)
-$footnoteLabel.Location = New-Object System.Drawing.Point(32, 484)
+$footnoteLabel.Location = New-Object System.Drawing.Point(32, 496)
 $form.Controls.Add($footnoteLabel)
+
+$ctrlCheckbox.Checked = $script:appConfig.Modifiers -contains "Control"
+$shiftCheckbox.Checked = $script:appConfig.Modifiers -contains "Shift"
+$altCheckbox.Checked = $script:appConfig.Modifiers -contains "Alt"
+$winCheckbox.Checked = $script:appConfig.Modifiers -contains "Win"
+$keyCombo.SelectedItem = $script:appConfig.Key
 
 $triggerButton.Add_Click({ Invoke-VoiceTyping })
 
@@ -266,29 +473,60 @@ $languageButton.Add_Click({
   Update-Status -Text "Opened Windows language settings." -State "Settings"
 })
 
-$hotkeyWindow = New-Object EchoType.HotkeyWindow
-$hotkeyId = 9001
-$hotkeyRegistered = [EchoType.NativeMethods]::RegisterHotKey(
-  $hotkeyWindow.Handle,
-  $hotkeyId,
-  ([EchoType.NativeMethods]::MOD_CONTROL -bor [EchoType.NativeMethods]::MOD_SHIFT),
-  0x20
-)
+$trayButton.Add_Click({
+  Hide-ToTray
+})
 
-if (-not $hotkeyRegistered) {
-  throw "Failed to register Ctrl+Shift+Space. Another app may already be using it."
-}
+$applyHotkeyButton.Add_Click({
+  try {
+    Apply-HotkeyFromControls
+  } catch {
+    [System.Windows.Forms.MessageBox]::Show($_.Exception.Message, "EchoType", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Warning) | Out-Null
+  }
+})
 
-$hotkeyWindow.add_HotkeyPressed({
+$script:hotkeyWindow = New-Object EchoType.HotkeyWindow
+$script:notifyIcon = New-Object System.Windows.Forms.NotifyIcon
+$script:notifyIcon.Icon = [System.Drawing.SystemIcons]::Information
+$script:notifyIcon.Text = "EchoType"
+$script:notifyIcon.Visible = $true
+
+$script:trayMenu = New-Object System.Windows.Forms.ContextMenuStrip
+[void]$script:trayMenu.Items.Add("Open EchoType", $null, { Show-MainWindow })
+[void]$script:trayMenu.Items.Add("Trigger voice typing", $null, { Invoke-VoiceTyping })
+[void]$script:trayMenu.Items.Add("Exit", $null, {
+  $script:allowExit = $true
+  $form.Close()
+})
+$script:notifyIcon.ContextMenuStrip = $script:trayMenu
+$script:notifyIcon.add_DoubleClick({ Show-MainWindow })
+
+Register-AppHotkey -Modifiers $script:appConfig.Modifiers -KeyName $script:appConfig.Key
+
+$script:hotkeyWindow.add_HotkeyPressed({
   Invoke-VoiceTyping
 })
 
-$form.Add_FormClosing({
-  try {
-    [EchoType.NativeMethods]::UnregisterHotKey($hotkeyWindow.Handle, $hotkeyId) | Out-Null
-  } catch {}
+$form.Add_Resize({
+  if ($form.WindowState -eq [System.Windows.Forms.FormWindowState]::Minimized) {
+    Hide-ToTray
+  }
+})
 
-  try { $hotkeyWindow.Dispose() } catch {}
+$form.Add_FormClosing({
+  if (-not $script:allowExit) {
+    $_.Cancel = $true
+    Hide-ToTray
+    return
+  }
+
+  try { Unregister-AppHotkey } catch {}
+  try { $script:hotkeyWindow.Dispose() } catch {}
+  try {
+    $script:notifyIcon.Visible = $false
+    $script:notifyIcon.Dispose()
+  } catch {}
+  try { $script:trayMenu.Dispose() } catch {}
 })
 
 [void]$form.ShowDialog()

@@ -5,10 +5,11 @@ This is the Windows desktop MVP for EchoType.
 ## What it does
 
 - Runs as a small Windows app
-- Registers a global hotkey: `Ctrl + Shift + Space`
+- Registers a global hotkey and lets you change it
 - Triggers Windows voice typing in the active app
 - Works outside the browser because it uses the system voice typing layer
 - Fits the real high-frequency use case: chat apps, AI tools, notes, and web forms
+- Can hide to the system tray and keep running in the background
 
 ## How to run
 
@@ -18,6 +19,12 @@ This is the Windows desktop MVP for EchoType.
 4. Press `Ctrl + Shift + Space`
 5. Windows voice typing opens in that target app
 6. Speak directly into that input field
+
+## New in this version
+
+- `Hide to tray` button
+- tray icon with `Open EchoType`, `Trigger voice typing`, and `Exit`
+- custom hotkey controls with saved settings in `desktop/config.json`
 
 ## Current language support
 
@@ -34,4 +41,4 @@ That means:
 - The web page is still a demo and landing page.
 - The desktop script is the actual route to system-wide input.
 - This MVP intentionally uses Windows' native voice typing because that is the fastest stable way to get cross-app input working.
-- If another app already uses `Ctrl + Shift + Space`, the hotkey registration will fail until you close or remap that app.
+- If another app already uses your chosen hotkey, EchoType will warn you and you should pick another one.
